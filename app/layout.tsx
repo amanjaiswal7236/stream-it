@@ -1,6 +1,6 @@
 import { ClerkProvider } from '@clerk/nextjs';
 import {  dark, neobrutalism  } from '@clerk/themes';
-import { ThemeProvider } from '@/components/ui/theme-provider';
+import { ThemeProvider } from '@/components/theme-provider';
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
