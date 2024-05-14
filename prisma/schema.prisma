@@ -22,7 +22,7 @@ model User {
   following Follow[] @relation("Following")
   followers Follow[] @relation("FollowedBy")
 
-  blocked Block[] @relation("Blocking")
+  blocking Block[] @relation("Blocking")
   blockedBy Block[] @relation("BlockedBy")
   
   createdAt DateTime @default(now())

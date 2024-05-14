@@ -20,7 +20,7 @@ export const Actions = async () => {
                     size="sm"
                     variant="ghost" 
                     className="text-muted-foreground hover:text-primary">
-                        <Link href={`/u/$user.username`}>
+                        <Link href={`/u/${user.username}`}>
                             <Clapperboard className="h-5 w-5 lg:mr-2" />
                             <span className="hidden lg:block">
                                 Dashboard
