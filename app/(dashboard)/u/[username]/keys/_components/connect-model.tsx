@@ -44,12 +44,15 @@ export const ConnectModel = () => {
 
     const onSubmit = () => {
         startTransition(() => {
-            createIngress(parseInt(ingressType))
+            createIngress(parseInt(ingressType) as IngressInput)
                 .then(() => {
                     toast.success("Connection generated");
                     closeRef?.current?.click();
                 })
-                .catch(() => toast.error("Failed to generate connection"))
+                .catch((error) => {
+                    const message = error instanceof Error ? error.message : "Failed to generate connection";
+                    toast.error(message);
+                })
         });
     }
     return (

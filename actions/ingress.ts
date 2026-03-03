@@ -9,7 +9,6 @@ import {
     TrackSource,
     type CreateIngressOptions,
     IngressVideoOptions,
-    IngressAudioEncodingOptions,
     IngressAudioOptions
 } from "livekit-server-sdk";
 
@@ -24,25 +23,55 @@ const roomService = new RoomServiceClient(
     process.env.LIVEKIT_API_SECRET!
 );
 
-export const resetIngress = async (hostIdentity: string) => {
-    const ingresses = await ingressClient.listIngress({
-        roomName: hostIdentity,
-    });
+const ingressClient = new IngressClient(process.env.LIVEKIT_API_URL!, process.env.LIVEKIT_API_KEY!, process.env.LIVEKIT_API_SECRET!);
 
-    const rooms = await roomService.listRooms([hostIdentity]);
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+const isRateLimitedError = (error: unknown) => {
+    const message = error instanceof Error ? error.message : String(error);
+    return message.includes("status 429");
+};
+
+const runWithLivekitRetry = async <T>(operation: () => Promise<T>, maxAttempts = 4): Promise<T> => {
+    let lastError: unknown;
+
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+        try {
+            return await operation();
+        } catch (error) {
+            lastError = error;
+            const shouldRetry = isRateLimitedError(error) && attempt < maxAttempts;
+
+            if (!shouldRetry) {
+                throw error;
+            }
+
+            const backoffMs = 500 * Math.pow(2, attempt - 1);
+            await sleep(backoffMs);
+        }
+    }
+
+    throw lastError;
+};
+
+export const resetIngress = async (hostIdentity: string) => {
+    const ingresses = await runWithLivekitRetry(() => ingressClient.listIngress({
+        roomName: hostIdentity,
+    }));
+
+    const rooms = await runWithLivekitRetry(() => roomService.listRooms([hostIdentity]));
 
     for (const room of rooms) {
-        await roomService.deleteRoom(room.name);
+        await runWithLivekitRetry(() => roomService.deleteRoom(room.name));
     }
 
     for (const ingress of ingresses) {
         if(ingress.ingressId){
-            await ingressClient.deleteIngress(ingress.ingressId);
+            await runWithLivekitRetry(() => ingressClient.deleteIngress(ingress.ingressId!));
         }
     }
 }
 
-const ingressClient = new IngressClient(process.env.LIVEKIT_API_URL!)
 
 export const createIngress = async (ingressType: IngressInput) => {
     const self = await getSelf();
@@ -54,28 +83,28 @@ export const createIngress = async (ingressType: IngressInput) => {
         roomName: self.id,
         participantName: self.username,
         participantIdentity: self.id,
-
-        video: new IngressVideoOptions({
-            source: TrackSource.CAMERA,
-            encodingOptions: {
-                case: 'preset',
-                value: IngressVideoEncodingPreset.H264_1080P_30FPS_1_LAYER
-            }
-        }),
-
-        audio: new IngressAudioOptions({
-            source: TrackSource.MICROPHONE,
-            encodingOptions: {
-                case: 'preset',
-                value: IngressAudioEncodingPreset.OPUS_STEREO_96KBPS
-            }
-        })
     };
 
+    if (ingressType === IngressInput.RTMP_INPUT) {
+        options.video = new IngressVideoOptions({
+            source: TrackSource.CAMERA,
+            encodingOptions: {
+                case: "preset",
+                value: IngressVideoEncodingPreset.H264_1080P_30FPS_1_LAYER,
+            },
+        });
 
-    const ingress = await ingressClient.createIngress(
-        ingressType,
-        options,
+        options.audio = new IngressAudioOptions({
+            source: TrackSource.MICROPHONE,
+            encodingOptions: {
+                case: "preset",
+                value: IngressAudioEncodingPreset.OPUS_STEREO_96KBPS,
+            },
+        });
+    }
+
+    const ingress = await runWithLivekitRetry(
+        () => ingressClient.createIngress(ingressType, options),
     );
 
     if(!ingress || !ingress.url || !ingress.streamKey){

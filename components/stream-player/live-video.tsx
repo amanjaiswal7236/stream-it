@@ -78,9 +78,9 @@ export const LiveVideo = ({
             <div className="absolute top-0 h-full w-full opacity-0 hover:opacity-100 hover:transition-all">
                 <div className="absolute bottom-0 flex h-14 w-full items-center justify-between bg-gradient-to-r from-neutral-900 px-4">
                     <VolumeControl
-                        value={100}
-                        onChange={()=>{}}
-                        onToggle={()=>{}}
+                        value={volume}
+                        onChange={onVolumeChange}
+                        onToggle={toggleMute}
                     />
                     <FullScreenControl
                         isFullScreen={isFullScreen}
